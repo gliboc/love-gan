@@ -1,5 +1,13 @@
 # vega
 
+## Requirements
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
 ## Architecture 
 
 - cache: Preprocessed datasets that don’t need to be re-generated every time you perform an analysis.
