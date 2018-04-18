@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from numpy import zeros, ones
+
+from glob import glob
+
+
+from PIL import Image
+
+from numpy import zeros, ones, array
 from numpy.random import randint, normal
 
 from keras.models import Sequential, Model
@@ -42,10 +48,9 @@ class DCGAN:
         self.comb = Model(z, self.discr(self.gen(z)))
         self.comb.compile(loss='binary_crossentropy', optimizer=optimizer)
 
-
     def train(self, epochs, half_batch, save_interval):
         # TODO: load images
-        x_train = None
+        x_train = self.load_images()
 
         for epoch in range(epochs):
             ## Discriminator
@@ -68,8 +73,33 @@ class DCGAN:
             if epoch % save_interval == 0:
                 self.save_images(epoch)
 
-    def save_images(self, epoch):
-        return
+    def load_images(self):
+        xs = []
+
+        for path in glob('input/*.png'):
+            img = array(Image.open(path))
+            if img.shape == self.img_shape:
+                xs.append(img)
+            else:
+                print('bad shape for %s: %s' % (path, img.shape))
+
+        return array(xs)
+
+    def save_images(self, epoch, n=(5, 5)):
+        imgs = self.gen.predict(normal(0, 1, (n[0] * n[1], self.nz)))
+
+        # size of a tile
+        s0 = self.img_shape[0] + 2
+        s1 = self.img_shape[1] + 2
+
+        out = Image.new('rgb', (2 + n[0]*s0, 2 + n[1]*s1))
+
+        for i in range(n[0]):
+            for j in range(n[1]):
+                out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode='rgb'),
+                          (2 + s0*i, 2 + s1*j))
+
+        out.save('output/dcgan_%04i.png')
 
     def build_generator(self):
         """Create the generator model as described in the paper."""
