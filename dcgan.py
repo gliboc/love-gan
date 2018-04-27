@@ -3,7 +3,7 @@
 
 
 from glob import glob
-from os.path import join
+from os import path
 
 
 from PIL import Image
@@ -26,7 +26,7 @@ CONFIG = {
     'lr': 0.0002, # initial learning rate for adam
     'beta1': 0.5, # momentum term for adam
     'alpha': 0.2, # LeakyReLU slope parameter
-    'src_path': 'input/hands_32', # path where test images are
+    'src_path': 'input/hands_64', # path where test images are
     'otp_path': 'output' # path in which to put generated images
 }
 
@@ -67,7 +67,8 @@ class DCGAN:
             fake = self.gen.predict(z)
             d_loss_f = self.discr.train_on_batch(fake, zeros((half_batch, 1)))
 
-            d_loss = .5*(d_loss_r + d_loss_f)
+            print(d_loss_r, d_loss_f)
+            d_loss = [.5*(x + y) for (x, y) in zip(d_loss_r, d_loss_f)]
 
             ## Generator
             z = normal(0, 1, (2 * half_batch, self.nz))
@@ -82,12 +83,12 @@ class DCGAN:
     def load_images(self):
         xs = []
 
-        for path in glob(join(self.src_path, '*.jpg')):
-            img = array(Image.open(path))
+        for f in glob(path.join(self.src_path, '*.jpg')):
+            img = array(Image.open(f))
             if img.shape == self.img_shape:
                 xs.append(img)
             else:
-                print('bad shape for %s: %s' % (path, img.shape))
+                print('bad shape for %s: %s' % (f, img.shape))
 
         return array(xs)
 
@@ -98,14 +99,14 @@ class DCGAN:
         s0 = self.img_shape[0] + 2
         s1 = self.img_shape[1] + 2
 
-        out = Image.new('rgb', (2 + n[0]*s0, 2 + n[1]*s1))
+        out = Image.new('RGB', (2 + n[0]*s0, 2 + n[1]*s1))
 
         for i in range(n[0]):
             for j in range(n[1]):
-                out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode='rgb'),
+                out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode='RGB'),
                           (2 + s0*i, 2 + s1*j))
 
-        out.save(join(self.otp_path, '/dcgan_%04i.png' % epoch))
+        out.save(path.join(self.otp_path, 'dcgan_%04i.png' % epoch))
 
     def build_generator(self):
         """Create the generator model as described in the paper."""
@@ -176,5 +177,5 @@ class DCGAN:
 
 if __name__ == '__main__':
     dcgan = DCGAN(**CONFIG)
-    dcgan.train(1, 20, 1)
+    dcgan.train(20, 200, 3)
 
