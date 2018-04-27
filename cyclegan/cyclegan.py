@@ -12,27 +12,33 @@ from numpy.random import randint, normal
 
 from keras.models import Sequential, Model
 from keras.layers import (Activation, BatchNormalization, LeakyReLU,
-                          Conv2D, Conv2DTranspose, Flatten, Reshape, Input)
+                          Conv2D, Conv2DTranspose, Flatten, Input)
 from keras.optimizers import Adam
 
 
 CONFIG = {
     'size': 64,   # size of generated pictures
     'ngf': 64,    # number of G filters for the first conv layer
-    'nz': 100,    # dimension for Z
+    'nx': 100,    # dimension for X
+    'ny': 100,    # dimension for Y
     'nc': 3,      # number of output channels
     'ndf': 64,    # number of D filters for the first conv layer
     'lr': 0.0002, # initial learning rate for adam
     'beta1': 0.5, # momentum term for adam
     'alpha': 0.2, # LeakyReLU slope parameter
+    'img_size': 32,
+    'batch_size': 100
 }
 
 class DCGAN:
-    def __init__(self, **cfg):
+    def __init__(self, cfg):
         self.img_shape = (cfg['size'], cfg['size'], cfg['nc'])
-        self.nz = cfg['nz']
+        self.nx = cfg['nx']
+        self.ny = cfg['ny']
         self.ngf, self.ndf = cfg['ngf'], cfg['ndf']
         self.alpha = cfg['alpha']
+        self.batch_size = cfg['batch_size']
+        self.img = cfg['img_size']
 
         optimizer = Adam(lr=cfg['lr'], beta_1=cfg['beta1'])
 
@@ -47,14 +53,28 @@ class DCGAN:
         self.discr2.trainable = False
 
         self.gen1 = self.build_generator()
-        self.gen1.compile(loss='binary_crossentropy', optimizer=optimizer)
 
         self.gen2 = self.build_generator()
-        self.gen2.compile(loss='binary_crossentropy', optimizer=optimizer)
 
-        z = Input(shape=(self.nz,))
-        self.comb = Model(z, self.discr(self.gen(z)))
-        self.comb.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+        x = Input(shape=(self.nx,))
+        y = Input(shape=(self.ny,))
+        self.first_gen = self.discr1(self.gen1(x))
+        self.second_gen = self.discr2(self.gen2(y))
+
+        #self.m1_gen= Model(y, self.gen1(x))
+        #self.m1_gen.compile(loss='mean_squared_error', optimizer=optimizer)
+
+        self.comb1 = Model(x, self.first_gen)
+
+        self.comb2 = Model(y, self.second_gen)
+
+        self.comb = Model(x, (self.gen2(self.gen1(x))))
+
+        #self.comb = Model(z, self.discr(self.gen(z)))
+        self.comb.compile(loss='mean_absolute_error', optimizer=optimizer)
+
+        self.comb.summary()
 
     def train(self, epochs, half_batch, save_interval):
         # TODO: load images
@@ -63,11 +83,11 @@ class DCGAN:
         for epoch in range(epochs):
             ## Discriminator
             real = x_train[randint(0, x_train.shape[0], half_batch)]
-            d_loss_r = self.discr.train_on_batch(real, ones((half_batch, 1)))
+            d_loss_r = self.discr1.train_on_batch(real, ones((half_batch, 1)))
 
             z = normal(0, 1, (half_batch, self.nz))
-            fake = self.gen.predict(z)
-            d_loss_f = self.discr.train_on_batch(fake, zeros((half_batch, 1)))
+            fake = self.gen1.predict(z)
+            d_loss_f = self.discr1.train_on_batch(fake, zeros((half_batch, 1)))
 
             d_loss = .5*(d_loss_r + d_loss_f)
 
@@ -114,8 +134,7 @@ class DCGAN:
 
         model = Sequential()
 
-        model.add(Reshape((1, 1, self.nz), input_shape=(self.nz,)))
-        model.add(Conv2DTranspose(filters=self.ngf * 8, kernel_size=4))
+        model.add(Conv2DTranspose(filters=self.ngf * 8, kernel_size=4, input_shape=(self.batch_size, self.img, self.img)))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
