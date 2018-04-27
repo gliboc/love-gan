@@ -3,6 +3,7 @@
 
 
 from glob import glob
+from os.path import join
 
 
 from PIL import Image
@@ -25,6 +26,8 @@ CONFIG = {
     'lr': 0.0002, # initial learning rate for adam
     'beta1': 0.5, # momentum term for adam
     'alpha': 0.2, # LeakyReLU slope parameter
+    'src_path': 'input/hands_32', # path where test images are
+    'otp_path': 'output' # path in which to put generated images
 }
 
 class DCGAN:
@@ -43,6 +46,9 @@ class DCGAN:
 
         self.gen = self.build_generator()
         self.gen.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+        self.src_path = cfg['src_path']
+        self.otp_path = cfg['otp_path']
 
         z = Input(shape=(self.nz,))
         self.comb = Model(z, self.discr(self.gen(z)))
@@ -76,7 +82,7 @@ class DCGAN:
     def load_images(self):
         xs = []
 
-        for path in glob('input/*.png'):
+        for path in glob(join(self.src_path, '*.jpg')):
             img = array(Image.open(path))
             if img.shape == self.img_shape:
                 xs.append(img)
@@ -99,7 +105,7 @@ class DCGAN:
                 out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode='rgb'),
                           (2 + s0*i, 2 + s1*j))
 
-        out.save('output/dcgan_%04i.png')
+        out.save(join(self.otp_path, '/dcgan_%04i.png' % epoch))
 
     def build_generator(self):
         """Create the generator model as described in the paper."""
@@ -166,3 +172,9 @@ class DCGAN:
         model.summary()
 
         return model
+
+
+if __name__ == '__main__':
+    dcgan = DCGAN(**CONFIG)
+    dcgan.train(1, 20, 1)
+
