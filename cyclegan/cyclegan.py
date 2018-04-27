@@ -11,7 +11,7 @@ from numpy import zeros, ones, array
 from numpy.random import randint, normal
 
 from keras.models import Sequential, Model
-from keras.layers import (Dense, Activation, BatchNormalization, LeakyReLU,
+from keras.layers import (Activation, BatchNormalization, LeakyReLU,
                           Conv2D, Conv2DTranspose, Flatten, Reshape, Input)
 from keras.optimizers import Adam
 
@@ -36,13 +36,21 @@ class DCGAN:
 
         optimizer = Adam(lr=cfg['lr'], beta_1=cfg['beta1'])
 
-        self.discr = self.build_discriminator()
-        self.discr.compile(loss='binary_crossentropy', optimizer=optimizer,
+        self.discr1 = self.build_discriminator()
+        self.discr1.compile(loss='binary_crossentropy', optimizer=optimizer,
                            metrics=['accuracy'])
-        self.discr.trainable = False
+        self.discr1.trainable = False
 
-        self.gen = self.build_generator()
-        self.gen.compile(loss='binary_crossentropy', optimizer=optimizer)
+        self.discr2 = self.build_discriminator()
+        self.discr2.compile(loss='binary_crossentropy', optimizer=optimizer,
+                           metrics=['accuracy'])
+        self.discr2.trainable = False
+
+        self.gen1 = self.build_generator()
+        self.gen1.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+        self.gen2 = self.build_generator()
+        self.gen2.compile(loss='binary_crossentropy', optimizer=optimizer)
 
         z = Input(shape=(self.nz,))
         self.comb = Model(z, self.discr(self.gen(z)))
@@ -108,23 +116,23 @@ class DCGAN:
 
         model.add(Reshape((1, 1, self.nz), input_shape=(self.nz,)))
         model.add(Conv2DTranspose(filters=self.ngf * 8, kernel_size=4))
-        model.add(BatchNormalization())
         model.add(Activation('relu'))
+        model.add(BatchNormalization())
 
         model.add(Conv2DTranspose(filters=self.ngf * 4, kernel_size=4,
                                   strides=2, padding='same'))
-        model.add(BatchNormalization())
         model.add(Activation('relu'))
+        model.add(BatchNormalization())
 
         model.add(Conv2DTranspose(filters=self.ngf * 2, kernel_size=4,
                                   strides=2, padding='same'))
-        model.add(BatchNormalization())
         model.add(Activation('relu'))
+        model.add(BatchNormalization())
 
         model.add(Conv2DTranspose(filters=self.ngf, kernel_size=4,
                                   strides=2, padding='same'))
-        model.add(BatchNormalization())
         model.add(Activation('relu'))
+        model.add(BatchNormalization())
 
         model.add(Conv2DTranspose(filters=self.img_shape[2], kernel_size=4,
                                   strides=2, padding='same',
@@ -146,18 +154,18 @@ class DCGAN:
 
         model.add(Conv2D(filters=self.ndf * 2, kernel_size=4, padding='same',
                          strides=2))
-        model.add(BatchNormalization())
         model.add(LeakyReLU(self.alpha))
+        model.add(BatchNormalization())
 
         model.add(Conv2D(filters=self.ndf * 4, kernel_size=4, padding='same',
                          strides=2))
-        model.add(BatchNormalization())
         model.add(LeakyReLU(self.alpha))
+        model.add(BatchNormalization())
 
         model.add(Conv2D(filters=self.ndf * 8, kernel_size=4, padding='same',
                          strides=2))
-        model.add(BatchNormalization())
         model.add(LeakyReLU(self.alpha))
+        model.add(BatchNormalization())
 
         model.add(Conv2D(filters=1, kernel_size=4, activation='sigmoid'))
         model.add(Flatten())
