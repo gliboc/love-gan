@@ -17,8 +17,8 @@ from keras.optimizers import Adam
 
 
 CONFIG = {
-    'size': 64,   # size of generated pictures
-    'ngf': 64,    # number of G filters for the first conv layer
+    'size': 32,   # size of generated pictures
+    'ngf': 16,    # number of G filters for the first conv layer
     'nx': 100,    # dimension for X
     'ny': 100,    # dimension for Y
     'nc': 3,      # number of output channels
@@ -26,19 +26,16 @@ CONFIG = {
     'lr': 0.0002, # initial learning rate for adam
     'beta1': 0.5, # momentum term for adam
     'alpha': 0.2, # LeakyReLU slope parameter
-    'img_size': 32,
-    'batch_size': 100
 }
 
-class DCGAN:
+class CYCLEGAN:
     def __init__(self, cfg):
         self.img_shape = (cfg['size'], cfg['size'], cfg['nc'])
         self.nx = cfg['nx']
         self.ny = cfg['ny']
         self.ngf, self.ndf = cfg['ngf'], cfg['ndf']
         self.alpha = cfg['alpha']
-        self.batch_size = cfg['batch_size']
-        self.img = cfg['img_size']
+        self.nc = cfg['nc']
 
         optimizer = Adam(lr=cfg['lr'], beta_1=cfg['beta1'])
 
@@ -57,8 +54,8 @@ class DCGAN:
         self.gen2 = self.build_generator()
 
 
-        x = Input(shape=(self.nx,))
-        y = Input(shape=(self.ny,))
+        x = Input(shape=self.img_shape)
+        y = Input(shape=self.img_shape)
         self.first_gen = self.discr1(self.gen1(x))
         self.second_gen = self.discr2(self.gen2(y))
 
@@ -134,27 +131,25 @@ class DCGAN:
 
         model = Sequential()
 
-        model.add(Conv2DTranspose(filters=self.ngf * 8, kernel_size=4, input_shape=(self.batch_size, self.img, self.img)))
+        model.add(Conv2D(filters=self.ngf, kernel_size=4, input_shape=self.img_shape))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
-        model.add(Conv2DTranspose(filters=self.ngf * 4, kernel_size=4,
-                                  strides=2, padding='same'))
+        model.add(Conv2D(filters=self.ngf * 4, kernel_size=4))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
-        model.add(Conv2DTranspose(filters=self.ngf * 2, kernel_size=4,
-                                  strides=2, padding='same'))
+        #model.add(Conv2DTranspose(filters=self.ngf * 2, kernel_size=4,
+        #                          strides=2, padding='same'))
+        #model.add(Activation('relu'))
+        #model.add(BatchNormalization())
+
+        model.add(Conv2DTranspose(filters=self.ngf, kernel_size=4))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
-        model.add(Conv2DTranspose(filters=self.ngf, kernel_size=4,
-                                  strides=2, padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-
-        model.add(Conv2DTranspose(filters=self.img_shape[2], kernel_size=4,
-                                  strides=2, padding='same',
+        model.add(Conv2DTranspose(filters=self.ngf, kernel_size=3))
+        model.add(Conv2DTranspose(filters=self.img_shape[2], kernel_size=2,
                                   activation='tanh'))
 
         print('\n%%% Generator %%%')
@@ -171,12 +166,12 @@ class DCGAN:
                          strides=2, input_shape=self.img_shape))
         model.add(LeakyReLU(self.alpha))
 
-        model.add(Conv2D(filters=self.ndf * 2, kernel_size=4, padding='same',
-                         strides=2))
-        model.add(LeakyReLU(self.alpha))
-        model.add(BatchNormalization())
+        #model.add(Conv2D(filters=self.ndf * 2, kernel_size=4, padding='same',
+        #                 strides=2))
+        #model.add(LeakyReLU(self.alpha))
+        #model.add(BatchNormalization())
 
-        model.add(Conv2D(filters=self.ndf * 4, kernel_size=4, padding='same',
+        model.add(Conv2D(filters=self.ndf, kernel_size=4, padding='same',
                          strides=2))
         model.add(LeakyReLU(self.alpha))
         model.add(BatchNormalization())
@@ -193,3 +188,5 @@ class DCGAN:
         model.summary()
 
         return model
+
+d = CYCLEGAN(CONFIG)
