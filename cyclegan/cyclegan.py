@@ -8,11 +8,11 @@ from glob import glob
 from PIL import Image
 
 from numpy import zeros, ones, array
-from numpy.random import randint, normal
+from numpy.random import randint
 
 from keras.models import Sequential, Model
 from keras.layers import (Activation, BatchNormalization, LeakyReLU,
-                          Conv2D, Conv2DTranspose, Flatten, Input)
+                          Conv2D, Conv2DTranspose, Flatten, Input, UpSampling2D)
 from keras.optimizers import Adam
 
 
@@ -50,9 +50,7 @@ class CYCLEGAN:
         self.discr2.trainable = False
 
         self.gen1 = self.build_generator()
-
         self.gen2 = self.build_generator()
-
 
         x = Input(shape=self.img_shape)
         y = Input(shape=self.img_shape)
@@ -63,45 +61,59 @@ class CYCLEGAN:
         #self.m1_gen.compile(loss='mean_squared_error', optimizer=optimizer)
 
         self.comb1 = Model(x, self.first_gen)
+        self.comb1.compile(loss='binary_crossentropy', optimizer=optimizer)
 
         self.comb2 = Model(y, self.second_gen)
+        self.comb2.compile(loss='binary_crossentropy', optimizer=optimizer)
 
         self.comb = Model(x, (self.gen2(self.gen1(x))))
-
-        #self.comb = Model(z, self.discr(self.gen(z)))
         self.comb.compile(loss='mean_absolute_error', optimizer=optimizer)
 
         self.comb.summary()
 
     def train(self, epochs, half_batch, save_interval):
         # TODO: load images
-        x_train = self.load_images()
+        x_train = self.load_images('dog')
+        y_train = self.load_images('cat')
+
 
         for epoch in range(epochs):
             ## Discriminator
-            real = x_train[randint(0, x_train.shape[0], half_batch)]
-            d_loss_r = self.discr1.train_on_batch(real, ones((half_batch, 1)))
+            print("Epoch %i" % epoch)
 
-            z = normal(0, 1, (half_batch, self.nz))
-            fake = self.gen1.predict(z)
-            d_loss_f = self.discr1.train_on_batch(fake, zeros((half_batch, 1)))
+            real_x = x_train[randint(0, x_train.shape[0], half_batch)]
+            real_y = y_train[randint(0, y_train.shape[0], half_batch)]
 
-            d_loss = .5*(d_loss_r + d_loss_f)
+            d_loss_r1 = self.discr1.train_on_batch(real_x, ones((half_batch, 1)))
+            d_loss_r2 = self.discr1.train_on_batch(real_y, ones((half_batch, 1)))
+
+            fake1 = self.gen1.predict(real_x)
+            d_loss_f1 = self.discr1.train_on_batch(fake1, zeros((half_batch, 1)))
+
+            fake2 = self.gen2.predict(real_y)
+            d_loss_f2 = self.discr2.train_on_batch(fake2, zeros((half_batch, 1)))
+
+            print("Discriminator losses:", d_loss_r1, d_loss_r2, d_loss_f1, d_loss_f2)
+
+            #print('[%04i] [D loss: %.3f, acc: %.2f%%]' %
+            #     (epoch, d_loss[0], 100*d_loss[1]))
 
             ## Generator
-            z = normal(0, 1, (2 * half_batch, self.nz))
-            g_loss = self.comb.train_on_batch(z, ones((2 * half_batch, 1)))
-
-            print('[%04i] [D loss: %.3f, acc: %.2f%%] [G loss: %.3f]' %
-                  (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            print("First GAN G")
+            self.comb1.fit(real_x, ones((half_batch, 1)), verbose=2)
+            print("\nSecond GAN F")
+            self.comb2.fit(real_y, ones((half_batch, 1)), verbose=2)
+            print("\nGlobal GAN")
+            self.comb.fit(real_x, real_y, verbose=2)
 
             if epoch % save_interval == 0:
-                self.save_images(epoch)
+                self.save_images('cats', real_x, epoch)
+                self.save_images('dogs', real_y, epoch)
 
-    def load_images(self):
+    def load_images(self, animals):
         xs = []
 
-        for path in glob('input/*.png'):
+        for path in glob('input/' + animals + '.*.jpg'):
             img = array(Image.open(path))
             if img.shape == self.img_shape:
                 xs.append(img)
@@ -110,21 +122,29 @@ class CYCLEGAN:
 
         return array(xs)
 
-    def save_images(self, epoch, n=(5, 5)):
-        imgs = self.gen.predict(normal(0, 1, (n[0] * n[1], self.nz)))
+    def save_images(self, name, inpt, epoch, n=(5, 5)):
+        if name == 'cats':
+            imgs = self.gen1.predict(inpt)
+        else:
+            imgs = self.gen2.predict(inpt)
 
         # size of a tile
         s0 = self.img_shape[0] + 2
         s1 = self.img_shape[1] + 2
 
-        out = Image.new('rgb', (2 + n[0]*s0, 2 + n[1]*s1))
+        mode = 'RGB'
+        try:
+            out = Image.new('RGB', (2 + n[0]*s0, 2 + n[1]*s1))
+        except:
+            mode = 'rgb'
+            out = Image.new('rgb', (2 + n[0]*s0, 2 + n[1]*s1))
 
         for i in range(n[0]):
             for j in range(n[1]):
-                out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode='rgb'),
+                out.paste(Image.fromarray(imgs[n[1]*i + j,:,:,:], mode=mode),
                           (2 + s0*i, 2 + s1*j))
 
-        out.save('output/dcgan_%04i.png')
+        out.save('output/' + name + '/cyclegan_%04i.png' % epoch)
 
     def build_generator(self):
         """Create the generator model as described in the paper."""
