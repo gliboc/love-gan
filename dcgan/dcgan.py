@@ -7,20 +7,21 @@ from os.path import join
 
 from PIL import Image
 
-from numpy import zeros, ones, array, float32, uint8, add
+from numpy import zeros, ones, array, add, uint8, float32
 from numpy.random import randint, normal
 
 from keras.models import Sequential, Model
 from keras.layers import (Dense, Activation, BatchNormalization, LeakyReLU,
-                          Conv2D, Conv2DTranspose, Flatten, Reshape, Input)
+                          Conv2D, Conv2DTranspose, Flatten, Reshape, Input,
+                          MaxPooling2D, UpSampling2D)
 from keras.optimizers import Adam
 
 
 CONFIG = {
     'size': 64,   # size of generated pictures
     'ngf': 64,    # number of G filters for the first conv layer
-    'nz': 100,    # dimension for Z
-    'nc': 3,      # number of image channels
+    'nz': 200,    # dimension for Z
+    'nc': 3,      # number of output channels
     'ndf': 64,    # number of D filters for the first conv layer
     'lr': 0.0002, # initial learning rate for adam
     'beta1': 0.5, # momentum term for adam
@@ -60,13 +61,11 @@ class DCGAN:
             ## Discriminator Training
 
             real_imgs = x_train[randint(0, x_train.shape[0], half_batch)]
-            z = normal(0, 1, (half_batch, self.nz))
-            fake_imgs = self.gen.predict(z)
+            fake_imgs = self.gen.predict(normal(0, 1, (half_batch, self.nz)))
 
             d_loss_r = self.discr.train_on_batch(real_imgs, ones((half_batch, 1)))
             d_loss_f = self.discr.train_on_batch(fake_imgs, zeros((half_batch, 1)))
             d_loss = 0.5 * add(d_loss_r, d_loss_f)
-
 
             ## Generator Training
 
@@ -85,17 +84,15 @@ class DCGAN:
         for f in glob(join(self.src_path, '*.jpg')):
             img = array(Image.open(f))
             if img.shape == self.img_shape:
-                img = (img.astype(float32) - 127.5) / 127.5
-                xs.append(img)
+                xs.append((img.astype(float32) - 127.5) / 127.5)
             else:
                 print('bad shape for %s: %s' % (f, img.shape))
 
         return array(xs)
 
     def save_images(self, epoch, n=(5, 5)):
-        z = normal(0, 1, (n[0] * n[1], self.nz))
-        imgs = self.gen.predict(z)
-        imgs = array(128 * imgs + 128, dtype=np.uint8)
+        imgs = self.gen.predict(normal(0, 1, (n[0] * n[1], self.nz)))
+        imgs = (127.5 * imgs + 127.5).astype(uint8)
 
         # size of a tile
         s0 = self.img_shape[0] + 2
@@ -117,7 +114,6 @@ class DCGAN:
 
         model.add(Reshape((1, 1, self.nz), input_shape=(self.nz,)))
         model.add(Conv2DTranspose(filters=self.ngf * 8, kernel_size=4))
-
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
@@ -126,16 +122,24 @@ class DCGAN:
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
+        # moins maxpooling, dropout+
+
+        model.add(BatchNormalization())
         model.add(Conv2DTranspose(filters=self.ngf * 2, kernel_size=4,
                                   strides=2, padding='same'))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
+
+        model.add(BatchNormalization())
+        model.add(MaxPooling2D(4))
+        model.add(UpSampling2D(4))
 
         model.add(Conv2DTranspose(filters=self.ngf, kernel_size=4,
                                   strides=2, padding='same'))
         model.add(Activation('relu'))
         model.add(BatchNormalization())
 
+        model.add(BatchNormalization())
         model.add(Conv2DTranspose(filters=self.img_shape[2], kernel_size=4,
                                   strides=2, padding='same',
                                   activation='tanh'))
@@ -164,6 +168,8 @@ class DCGAN:
                          strides=2))
         model.add(LeakyReLU(self.alpha))
         model.add(BatchNormalization())
+        model.add(MaxPooling2D(2))
+        model.add(UpSampling2D(2))
 
         model.add(Conv2D(filters=self.ndf * 8, kernel_size=4, padding='same',
                          strides=2))
@@ -181,5 +187,4 @@ class DCGAN:
 
 if __name__ == '__main__':
     dcgan = DCGAN(**CONFIG)
-    dcgan.train(200, 100, 1)
-
+    dcgan.train(4000, 140, 3)
