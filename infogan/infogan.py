@@ -240,10 +240,6 @@ class INFOGAN():
         return np.array(xs)
 
 
-
-
-
-
     def save_imgs(self, epoch, n=(10,20)):
         """ Print an output to visualize progress """
         s0 = self.img_rows + 2
