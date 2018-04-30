@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 
+from keras.utils.vis_utils import plot_model
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -9,7 +10,6 @@ from keras.optimizers import Adam
 from keras.utils import to_categorical
 import keras.backend as K
 
-import matplotlib.pyplot as plt
 from glob import glob
 from PIL import Image
 
@@ -109,6 +109,7 @@ class INFOGAN():
 
         print("Generator:")
         model.summary()
+        plot_model(model, to_file='model_plots/generator_plot.png', show_shapes=True, show_layer_names=True)
 
         return Model(gen_input, img)
 
@@ -156,6 +157,8 @@ class INFOGAN():
         m_lab = Model(img, label)
         m_lab.summary()
 
+        plot_model(model, to_file='model_plots/discriminator_plot.png', show_shapes=True, show_layer_names=True)
+        plot_model(model, to_file='model_plots/recognition_plot.png', show_shapes=True, show_layer_names=True)
         # Return discriminator and recognition network
         return (m_val, m_lab)
 
@@ -238,22 +241,28 @@ class INFOGAN():
 
 
 
-    def sample_images(self, epoch):
-        """ Print an output to visualize progress """
-        r, c = 10, 20
 
-        fig, axs = plt.subplots(r, c)
-        for i in range(c):
-            noise, _ = self.sample_generator_input(c)
-            label = to_categorical(np.full(fill_value=i, shape=(r,1)), num_classes=self.num_classes)
+
+
+    def save_imgs(self, epoch, n=(10,20)):
+        """ Print an output to visualize progress """
+        s0 = self.img_rows + 2
+        s1 = self.img_cols + 2
+
+        out = Image.new('RGB', (2 + n[0] * s0, 2 + n[1] * s1))
+
+
+        for i in range(n[0]):
+            noise, _ = self.sample_generator_input(n[0])
+            label = to_categorical(np.full(fill_value=i, shape=(n[1],1)), num_classes=self.num_classes)
             gen_input = np.concatenate((noise, label), axis=1)
-            gen_imgs = self.generator.predict(gen_input)
-            gen_imgs = 0.5 * gen_imgs + 0.5
-            for j in range(r):
-                axs[j,i].imshow(gen_imgs[j,:,:,0])
-                axs[j,i].axis('off')
-        fig.savefig("images/fruits_%d.png" % epoch)
-        plt.close()
+            imgs = self.generator.predict(gen_input)
+            imgs = np.array(128 * imgs + 128, dtype=np.uint8)
+            for j in range(n[1]):
+                img = imgs[n[1]*i + j,:,:,:]
+                out.paste(Image.fromarray(img, mode='RGB'), (2 + s0 * i, 2 + s1 * j))
+
+        out.save('images/fruits_%04i.png' % epoch)
 
 
     def save_model(self):
