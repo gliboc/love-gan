@@ -7,6 +7,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+You should also have installed your own version of TensorFlow.
+
 
 ## Data set
 - For DCGAN, we used the [11k Hands dataset](https://sites.google.com/view/11khands).
