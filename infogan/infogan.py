@@ -191,7 +191,6 @@ class INFOGAN():
 
         # Rescale -1 to 1
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-        print(X_train)
 
         half_batch = int(batch_size / 2)
 
@@ -224,13 +223,13 @@ class INFOGAN():
             print ("%d [D loss: %.2f, acc.: %.2f%%] [Q loss: %.2f] [G loss: %.2f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss[1], g_loss[2]))
 
             if epoch % sample_interval == 0:
-                self.sample_images(epoch)
+                self.save_imgs(epoch)
 
 
     def load_images(self):
         xs = []
 
-        for f in glob('./input/*.jpg'):
+        for f in glob('./input/fruits_96/*.jpg'):
             img = np.array(Image.open(f))
             if img.shape == self.img_shape:
                 xs.append(img)
@@ -240,22 +239,23 @@ class INFOGAN():
         return np.array(xs)
 
 
-    def save_imgs(self, epoch, n=(10,20)):
+    def save_imgs(self, epoch, n=(20,20)):
         """ Print an output to visualize progress """
         s0 = self.img_rows + 2
         s1 = self.img_cols + 2
 
         out = Image.new('RGB', (2 + n[0] * s0, 2 + n[1] * s1))
 
-
         for i in range(n[0]):
             noise, _ = self.sample_generator_input(n[0])
             label = to_categorical(np.full(fill_value=i, shape=(n[1],1)), num_classes=self.num_classes)
+
             gen_input = np.concatenate((noise, label), axis=1)
             imgs = self.generator.predict(gen_input)
             imgs = np.array(128 * imgs + 128, dtype=np.uint8)
+
             for j in range(n[1]):
-                img = imgs[n[1]*i + j,:,:,:]
+                img = imgs[j,:,:,:]
                 out.paste(Image.fromarray(img, mode='RGB'), (2 + s0 * i, 2 + s1 * j))
 
         out.save('images/fruits_%04i.png' % epoch)
@@ -280,5 +280,5 @@ class INFOGAN():
 
 if __name__ == "__main__":
     d = INFOGAN(**CONFIG)
-    d.train(500, 128, 2)
+    d.train(2000, 64, 2)
 
