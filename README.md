@@ -19,6 +19,19 @@ pip install -r requirements.txt
   python3 resize.py 32 input/hands_orig input/hands_32
   ```
 
+- For InfoGAN, we used the [Fruits 360 dataset](https://www.kaggle.com/moltean/fruits).
+  To set up the dataset to the expected pictures size `96x96`,
+  unzip the dataset in the folder `input`.
+  Then, merge the content of the different folders in a single folder: `input/fruits_orig`.
+  Actually, you can choose how many directories you use, and set the associated number of 
+  classes you expect inside the `CONFIG` table, in `infogan.py`.
+  You can then generate the images using:
+  
+  ```
+  mkdir input/fruits_96
+  python3 resize.py 96 input/fruits_orig input/fruits_96
+  ```
+
 ## Architecture 
 
 - cache: Preprocessed datasets that don’t need to be re-generated every time you perform an analysis.
